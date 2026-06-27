@@ -1,4 +1,4 @@
-module github.com/effre/autoru-parser
+module github.com/make-smart-products/autoru-parser
 
 go 1.22
 

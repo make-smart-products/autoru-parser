@@ -49,7 +49,6 @@ func parseHTML(pageURL, html string) (*Listing, error) {
 			}
 		}
 	}
-	mergeCharacteristics(doc, listing.Characteristics)
 	listing.Equipment = extractEquipmentSummary(doc)
 
 	if listing.Title == "" {
@@ -97,25 +96,6 @@ func extractSummarySections(doc *goquery.Document) []summarySection {
 	})
 
 	return sections
-}
-
-func mergeCharacteristics(doc *goquery.Document, characteristics map[string]string) {
-	doc.Find(`[data-testid="cardInfoSummary"]`).Each(func(_ int, block *goquery.Selection) {
-		title := cleanText(block.Find("h3").First().Text())
-		if title != "Характеристики" {
-			return
-		}
-		block.Find(`[class*="ComplexRow"]`).Each(func(_ int, row *goquery.Selection) {
-			label := cleanText(row.Find(`[class*="label"]`).First().Text())
-			value := cleanText(row.Find(`[class*="cellValue"]`).First().Text())
-			if label == "" {
-				label = cleanText(row.Find(`[class*="content"]`).First().Text())
-			}
-			if label != "" && value != "" {
-				characteristics[label] = value
-			}
-		})
-	})
 }
 
 var (
@@ -250,14 +230,25 @@ func extractSeller(doc *goquery.Document) string {
 func extractComment(doc *goquery.Document) string {
 	var comment string
 	doc.Find("h4").EachWithBreak(func(_ int, h *goquery.Selection) bool {
-		if cleanText(h.Text()) == "Комментарий продавца" {
-			comment = cleanText(h.Parent().Find("p, div").Not("h4").First().Text())
-			if comment == "" {
-				comment = cleanText(h.Next().Text())
-			}
-			return false
+		if cleanText(h.Text()) != "Комментарий продавца" {
+			return true
 		}
-		return true
+		parent := h.Parent()
+		parent.Find("p, div").EachWithBreak(func(_ int, node *goquery.Selection) bool {
+			if goquery.NodeName(node) == "h4" {
+				return true
+			}
+			text := cleanText(node.Text())
+			if text != "" && text != "Комментарий продавца" {
+				comment = text
+				return false
+			}
+			return true
+		})
+		if comment == "" {
+			comment = cleanText(h.Next().Text())
+		}
+		return false
 	})
 	return comment
 }

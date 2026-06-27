@@ -45,3 +45,31 @@ type EquipmentGroup struct {
 	Name  string   `json:"name"`
 	Items []string `json:"items"`
 }
+
+// AllSpecs returns a flat map of ownership, characteristics, and catalog tech fields.
+func (l *Listing) AllSpecs() map[string]string {
+	if l == nil {
+		return nil
+	}
+	out := make(map[string]string, len(l.Ownership)+len(l.Characteristics)+32)
+	for k, v := range l.Ownership {
+		out["Владение: "+k] = v
+	}
+	for k, v := range l.Characteristics {
+		out[k] = v
+	}
+	for _, group := range l.TechSpecs {
+		prefix := group.Name
+		if prefix == "" || prefix == "NO_GROUP" {
+			prefix = ""
+		}
+		for _, field := range group.Fields {
+			key := field.Name
+			if prefix != "" {
+				key = prefix + ": " + field.Name
+			}
+			out[key] = field.Value
+		}
+	}
+	return out
+}

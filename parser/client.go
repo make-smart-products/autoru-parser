@@ -33,15 +33,29 @@ type Client struct {
 	http *http.Client
 }
 
+// Option configures Client.
+type Option func(*Client)
+
+// WithTimeout sets HTTP client timeout.
+func WithTimeout(d time.Duration) Option {
+	return func(c *Client) {
+		c.http.Timeout = d
+	}
+}
+
 // NewClient creates a parser client with cookie support and sane timeouts.
-func NewClient() *Client {
+func NewClient(opts ...Option) *Client {
 	jar, _ := cookiejar.New(nil)
-	return &Client{
+	c := &Client{
 		http: &http.Client{
 			Timeout: 45 * time.Second,
 			Jar:     jar,
 		},
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 // Parse fetches a listing page and enriches it with catalog tech data when available.
@@ -54,6 +68,10 @@ func (c *Client) Parse(ctx context.Context, pageURL string) (*Listing, error) {
 	html, err := c.fetch(ctx, pageURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("fetch page: %w", err)
+	}
+
+	if isBlockedPage(html) {
+		return nil, fmt.Errorf("access blocked or captcha page returned")
 	}
 
 	listing, err := parseHTML(pageURL, html)
@@ -209,4 +227,15 @@ func extractPhotos(html string) []string {
 		photos = append(photos, full)
 	}
 	return photos
+}
+
+func isBlockedPage(html string) bool {
+	lower := strings.ToLower(html)
+	if strings.Contains(lower, "smartcaptcha") {
+		return true
+	}
+	if strings.Contains(html, "Ошибка 403") || strings.Contains(html, "Нет доступа") {
+		return true
+	}
+	return false
 }
